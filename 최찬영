@@ -1,0 +1,218 @@
+//정보 과정형 수행평가
+//2219 최찬영
+//환경의 차이로 인한 야구 경기에서의 홈런 발생 빈도 차이 분석 
+
+#include <stdio.h>
+#include <windows.h>
+#include <string.h> // 파일 입력을 받기 위해 문자열을 이어 붙일 때 사용하는 strcat함수가 속해있는 헤더파일 
+#include <math.h>   //제곱과 제곱근 함수를 사용하기 위해 추가한 헤더파일 
+#define N 150       //rec_2,fac_2 배열에서 사용 
+
+double fac[13][32]; // 한 년도 동안의 날씨 데이터를 저장하는 전역변수 배열 (행: 달 / 열: 날짜) 
+int rec[13][32]; // 한 년도 동안 삼성라이온즈파크에서 있었던 경기의 날짜별 홈런 개수를 저장하는 전역변수 배열 
+int days[13]={0,31,29,31,30,31,30,31,31,30,31,30,31}; //각 달의 날짜 개수 
+double fac_2[N]; //경기가 있는 날의 날씨를 저장할 배열 
+int rec_2[N];    //경기가 있는 날의 경기를 저장할 배열 
+int e,k,y,a;
+//e는 파일 입력에 문제가 있을 때 프로그램을 종료하기 위한 변수
+//k는 process 함수에서 배열에 값을 저장할 때 사용, 최종적으로 총 경기수를 저장하게 된다.
+//y는 분석할 년도
+//a는 분석할 환경요인 숫자(1~3)
+
+double r; //상관계수 r값 
+
+void in(); //분석할 데이터 종류를 사용자 입력으로 받기 
+void in_file();//맞는 파일을 골라 입력받는 함수 
+void pr(); //프로그램 작성 중에 편의를 위해 입력받은 파일의 값을 확인하려고 만든 임시적인 함수 
+void process(); //경기가 없는 날의 데이터를 배제하는 함수 
+void analyze(); //데이터를 분석하여 피어슨 상관계수 r값을 구하는 함수 
+void result(); //결과를 출력해주는 함수 
+
+int main(){
+	//콘솔창 창 크기 조절
+	system("mode con cols=150 lines=35");
+	
+	//입력
+	printf("여러가지 환경 요인과 야구에서 홈런의 개수 간의 상관관계를 알아보는 데이터 분석 프로그램\n");
+	printf("두 변수 간의 관계를 피어슨 상관 계수 r값으로 출력\n");
+	in();
+	in_file();
+	if(e==1)return 0;//파일을 통한 데이터 입력에 문제가 생겼을 때 나머지 함수가 실행되기 전에 프로그램을 종료시킨다. 
+	
+	//분석
+	process(); 
+	analyze();
+	
+	//출력 
+	//pr();  //이 함수의 출력 결과를 볼 때는 콘솔창 크기를 늘려야 제대로 보입니다. 
+	result(); 
+	
+	
+	//다 한꺼번에 출력하는 부분이 있으면 좋을 것 같아서  추가한 코드 
+	int x; 
+	char choice[80]; 
+	char *end;	
+	char facname[3][30]={"상대습도","평균기온","  강수량"};
+	
+	printf("\n\n");
+	do {
+		printf("1을 입력하면 모든 결과의 상관계수를 출력합니다(프로그램을 종료하려면 0을 입력)>>>");
+		gets(choice);
+		fflush(stdin);
+		x = strtol(choice, &end, 10);
+	} 
+	while(x>1||x<0);
+	
+	if (x==1){
+		for (y=2016;y<2019;y++){
+			for (a=1;a<4;a++){
+					in_file();
+					if(e==1)return 0;//파일을 통한 데이터 입력에 문제가 생겼을 때 나머지 함수가 실행되기 전에 프로그램을 종료시킨다. 
+	
+					//분석
+					process(); 
+					analyze();
+					printf("%d년도에서 %s에 의한 홈런개수 변화에 대한 상관계수: %f\n",y,facname[a-1],r);
+			}
+		}
+	}
+	
+	return 0;
+} 
+
+void in(){ //분석할 데이터 종류를 사용자 입력으로 받은 뒤 그에 맞는 파일을 골라 입력받는다 
+
+	int i,j; //i와 j는 입력시 for문을 실행시키기 위한 변수 
+	char choice[80]; 
+	char *end;	
+
+	printf("선택 가능한 환경요인: 1.상대습도 2.평균기온 3.강수량\n");
+	
+	//분석할 환경요인을 입력받는 부분>>> 1~3 정수형 전역변수 a에 저장 
+	do {
+		printf("분석할 환경요인을 1에서 3까지의 숫자로 입력하세요>>>");
+		gets(choice);
+		fflush(stdin);
+		a = strtol(choice, &end, 10);
+	} while(a<1 || a>4);
+	
+	//분석할 년도를 입력받는 부분>>> 2016~2020 정수형 전역변수 y에 저장 
+	do {
+		printf("2016년도 부터 2018년도까지  분석하고 싶은 한국프로야구 시즌을 입력하시오(예: 2016 )>>>");
+		gets(choice);
+		fflush(stdin);
+		y = strtol(choice, &end, 10);
+	} while(y<2016 || y>2018);
+}
+
+void in_file(){
+	int i,j;
+	FILE *fp;
+	char filename[4][10]={"hum","tem","rain"} ;//환경요인 파일 이름 
+	char filename2[15]="record";//경기 결과 파일 이름   
+	k=0; //k가 여러번 반복되서 사용되기 때문에 초기화시켜줌 
+	char str_y[5];//년도를 문자열로 변형시킨 것을 저장하는  배열 
+	
+	sprintf(str_y,"%d",y); //정수형으로 입력받은 년도를 str_y라는 배열에 문자열로 저장 
+	
+	//파일 이름 뒤에 년도를 붙여서 입력 받을 경기 기록 파일 이름을 완성시킨다. ex)   record2016.CSV
+	strcat(filename2,str_y);     
+	strcat(filename2,".CSV");
+	
+	//경기 결과를 입력받는 부분 
+	fp=fopen(filename2, "r");
+	if( fp == NULL ){
+		printf("입력 파일이 잘못 지정되었거나 문제가 있습니다. 확인 바랍니다.\n") ;
+		e=1; //프로그램 중단 신호 
+		}
+	else 
+        while( !feof( fp ) ){
+        	for (i=1; i<13; i++){	
+					for (j=1; j<days[i]+1;j++)
+					fscanf(fp, "%d ", &rec[i][j]); 
+		}
+	}
+	
+	//파일 이름 뒤에 년도를 붙여서 입력 받을 환경요인 파일 이름을 완성시킨다. ex)  hum2016.CSV	
+	strcat(filename[a-1],str_y);
+	strcat(filename[a-1],".CSV");
+	
+	//환경요인을 입력받는 부분 
+	fp=fopen(filename[a-1], "r"); 
+	if( fp == NULL ){
+		printf("입력 파일이 잘못 지정되었거나 문제가 있습니다. 확인 바랍니다.\n") ;
+		e=1; //프로그램 중단 신호 
+		}
+	else 
+        while( !feof( fp ) ){
+        	for (i=1; i<32; i++){	
+				for (j=1; j<13; j++)
+					fscanf(fp, "%lf, ", &fac[j][i]); //파일의 행은 날짜, 열은 달이지만 입력받은 배열은 행을 달, 열을 날짜로 바꾸기 위해 i와 j를 뒤바꿔 놓았다. 
+		}
+	}
+	fclose(fp);
+	return;
+}
+
+void process(){ //경기가 없는 날의 데이터를 배제하는 함수 
+	int i,j;
+	for (i=1; i<13; i++){	
+		for (j=1; j<days[i]+1;j++)
+			if (rec[i][j]!=-1){
+				fac_2[k]=fac[i][j];
+				rec_2[k++]=rec[i][j]; //최종적으로 k는 (총 경기수+1)의 값을 저장하게 된다. 
+			}
+	}
+}
+
+
+void analyze(){
+ 	int i,a,b;
+ 	double covariance,fac_v,rec_v; //공분산 , 날씨의 분산 , 경기 기록의 분산 
+ 	double fac_av;
+ 	int rec_av;
+	for	(i=0;i<k;i++){
+		fac_av+=fac_2[i]; 
+		rec_av+=rec_2[i];
+	}
+	
+	fac_av/=(k-1);
+	rec_av/=(k-1);
+	for (i=0;i<k;i++){
+		a=fac_2[i]-fac_av;
+		b=rec_2[i]-rec_av;
+		fac_v+=pow(a,2);
+		rec_v+=pow(b,2);
+		covariance+=(a+1)*(b+1);
+	}
+	covariance/=k-1;
+	fac_v/=k;
+	rec_v/=k;
+	r=covariance/(sqrt(fac_v)*sqrt(rec_v));
+} 
+
+void result(){
+	printf("\n");
+	printf("=========================================================================결과=========================================================================\n");
+	printf("삼성라이온즈파크의  년도의 총 경기수 : %d\n",k);
+	printf("피어슨 상관계수 값 : %lf\n\n",r);
+	printf("=========================================================================결론=========================================================================\n");
+	printf("상관계수 값이 작지만 대부분의 경우에서 양수가 나온 것으로 보아 약간의 비례관계가 존재한다.\n");
+	printf("세가지 환경요인 중 평균기온에 의한 홈런 개수 변화가 가장 크다.\n");
+	printf("상관계수 값이 작게 나온 것으로 보아 데이터 분석을 할 때 부터 고민거리가 되었던 선수들의 실력 편차를 고려해지 못한 문제로 생각된다.\n");
+	printf("더 나은 데이터 분석을 위해서는 각 선수의 장타율을 고려하고, 각 경기마다의 타격 횟수를 알아내어 홈런 개수가 아니라 홈런 확률로 계산을 해야 할 것이다.\n ");
+}
+
+void pr(){ //임시로 만든 함수 
+	int i,j;
+	for (i=1;i<13;i++){
+		for (j=1;j<32;j++)
+			printf("%4.1f  ",fac[i][j]);
+		printf("\n");
+	}
+	for (i=1; i<13; i++){	
+		for (j=1; j<days[i]+1;j++)
+			printf("%4d  ",rec[i][j]);
+		printf("\n");			
+	}
+}
